@@ -54,6 +54,7 @@ type testOptions struct {
 	Message     string   `json:"message"`
 	Origin      string   `json:"origin"`
 	Service     []string `json:"service"`
+	Timeout     int      `json:"timeout"`
 }
 
 func (s *Service) TestOptions() interface{} {
@@ -68,6 +69,7 @@ func (s *Service) TestOptions() interface{} {
 		Message:     "test alerta message",
 		Origin:      c.Origin,
 		Service:     []string{"testServiceA", "testServiceB"},
+		Timeout:     60,
 	}
 }
 
@@ -90,6 +92,7 @@ func (s *Service) Test(options interface{}) error {
 		o.Origin,
 		o.Service,
 		models.Result{},
+		o.Timeout,
 	)
 }
 
@@ -123,12 +126,12 @@ func (s *Service) Update(newConfig []interface{}) error {
 	return nil
 }
 
-func (s *Service) Alert(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin string, service []string, data models.Result) error {
+func (s *Service) Alert(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin string, service []string, data models.Result, timeout int) error {
 	if resource == "" || event == "" {
 		return errors.New("Resource and Event are required to send an alert")
 	}
 
-	req, err := s.preparePost(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin, service, data)
+	req, err := s.preparePost(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin, service, data, timeout)
 	if err != nil {
 		return err
 	}
@@ -156,7 +159,7 @@ func (s *Service) Alert(token, tokenPrefix, resource, event, environment, severi
 	return nil
 }
 
-func (s *Service) preparePost(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin string, service []string, data models.Result) (*http.Request, error) {
+func (s *Service) preparePost(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin string, service []string, data models.Result, timeout int) (*http.Request, error) {
 	c := s.config()
 
 	if !c.Enabled {
@@ -198,6 +201,9 @@ func (s *Service) preparePost(token, tokenPrefix, resource, event, environment, 
 	postData["value"] = value
 	postData["text"] = message
 	postData["origin"] = origin
+	if timeout != nil {
+		postData["timeout"] = timeout
+	}
 	postData["rawData"] = data
 	if len(service) > 0 {
 		postData["service"] = service
@@ -260,6 +266,9 @@ type HandlerConfig struct {
 
 	// List of effected Services
 	Service []string `mapstructure:"service"`
+
+	// Timeout in seconds before an "open" alert will be automatically "expired" or "deleted"
+	Timeout int `mapstructure:"timeout"`
 }
 
 type handler struct {
@@ -414,6 +423,7 @@ func (h *handler) Handle(event alert.Event) {
 		h.c.Origin,
 		service,
 		event.Data.Result,
+		h.c.Timeout,
 	); err != nil {
 		h.logger.Printf("E! failed to send event to Alerta: %v", err)
 	}
