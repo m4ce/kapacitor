@@ -69,7 +69,7 @@ func (s *Service) TestOptions() interface{} {
 		Message:     "test alerta message",
 		Origin:      c.Origin,
 		Service:     []string{"testServiceA", "testServiceB"},
-		Timeout:     60,
+		Timeout:     0,
 	}
 }
 
@@ -201,7 +201,7 @@ func (s *Service) preparePost(token, tokenPrefix, resource, event, environment, 
 	postData["value"] = value
 	postData["text"] = message
 	postData["origin"] = origin
-	if timeout != nil {
+	if timeout > 0 {
 		postData["timeout"] = timeout
 	}
 	postData["rawData"] = data
